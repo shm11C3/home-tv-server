@@ -1,0 +1,6 @@
+---
+- name: Start runner service
+  ansible.builtin.command:
+    argv: ["./svc.sh", "start"]
+    chdir: "{{ github_runner_home }}"
+  changed_when: true

@@ -1,0 +1,9 @@
+---
+# PCI passthrough のためのホスト側前提設定。Proxmox インストール後に一度、
+# その後は vfio の ID が変わるたびに実行する。初回実行後は再起動が必要
+# （勝手に再起動はせず、メッセージを出すだけ）
+- name: Prepare Proxmox host for passthrough
+  hosts: proxmox
+  become: true
+  roles:
+    - proxmox_host

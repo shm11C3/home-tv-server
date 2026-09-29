@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Ansible 管理（home-tv-server）: EPGStation の DB をダンプし、古いダンプを削除する
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_dir }}"
+COMPOSE_DIR="{{ apps_compose_dir }}"
+KEEP_DAYS="{{ backup_keep_days }}"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+mkdir -p "${BACKUP_DIR}"
+cd "${COMPOSE_DIR}"
+
+docker compose exec -T {{ backup_compose_db_service }} \
+  sh -c 'exec mariadb-dump --single-transaction --quick -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' \
+  | gzip -9 > "${BACKUP_DIR}/{{ backup_db_name }}-${STAMP}.sql.gz"
+
+# EPGStation は data ディレクトリに小さな状態ファイルを持つので、それも併せて退避する
+tar -C "${COMPOSE_DIR}/data" -czf "${BACKUP_DIR}/epgstation-data-${STAMP}.tar.gz" epgstation 2>/dev/null || true
+
+find "${BACKUP_DIR}" -type f -mtime "+${KEEP_DAYS}" -delete

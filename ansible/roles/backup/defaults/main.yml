@@ -1,0 +1,3 @@
+---
+backup_compose_db_service: mariadb
+backup_db_name: epgstation

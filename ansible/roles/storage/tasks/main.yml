@@ -1,0 +1,43 @@
+---
+- name: Install mergerfs
+  ansible.builtin.apt:
+    name: mergerfs
+    state: present
+    update_cache: true
+
+- name: Create per-disk mountpoints
+  ansible.builtin.file:
+    path: "{{ item.mountpoint }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ recording_disks }}"
+
+- name: Mount existing recording disks
+  ansible.posix.mount:
+    path: "{{ item.mountpoint }}"
+    src: "{{ item.device }}"
+    fstype: "{{ item.fstype }}"
+    opts: defaults,noatime,nofail
+    state: mounted
+  loop: "{{ recording_disks }}"
+
+- name: Create recording pool mountpoint
+  ansible.builtin.file:
+    path: "{{ recording_pool_mountpoint }}"
+    state: directory
+    mode: "0775"
+
+- name: Build mergerfs source string
+  ansible.builtin.set_fact:
+    storage_mergerfs_source: "{{ recording_disks | map(attribute='mountpoint') | join(':') }}"
+    storage_mergerfs_requires: "{{ recording_disks | map(attribute='mountpoint') | map('regex_replace', '^', 'x-systemd.requires-mounts-for=') | join(',') }}"
+  when: recording_disks | length > 0
+
+- name: Mount mergerfs recording pool
+  ansible.posix.mount:
+    path: "{{ recording_pool_mountpoint }}"
+    src: "{{ storage_mergerfs_source }}"
+    fstype: fuse.mergerfs
+    opts: "{{ recording_mergerfs_options }},{{ storage_mergerfs_requires }}"
+    state: mounted
+  when: recording_disks | length > 0

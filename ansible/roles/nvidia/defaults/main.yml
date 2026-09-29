@@ -1,0 +1,9 @@
+---
+# Debian 13 の non-free には 550 系ドライバがあり、Pascal（GTX 1050）を引き続き
+# サポートしている。ここでは意図的にバージョンを固定しない
+nvidia_packages:
+  - nvidia-driver
+  - firmware-misc-nonfree
+  - nvidia-smi
+nvidia_container_toolkit_repo: https://nvidia.github.io/libnvidia-container/stable/deb/amd64
+nvidia_container_toolkit_key_url: https://nvidia.github.io/libnvidia-container/gpgkey

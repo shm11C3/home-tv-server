@@ -1,0 +1,4 @@
+# Ansible 管理（home-tv-server）: ホストは passthrough 対象の GPU に触らない
+{% for m in proxmox_host_blacklist_modules %}
+blacklist {{ m }}
+{% endfor %}

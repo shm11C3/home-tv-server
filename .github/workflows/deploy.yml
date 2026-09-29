@@ -1,0 +1,52 @@
+# デプロイ: recorder VM 上の self-hosted runner（ansible/roles/github_runner）が job を受け取り、
+# ローカルで checkout を更新して compose を適用する。外からの SSH 経路や Tailscale の
+# secrets は不要。runner が登録されるまで job が queue に溜まらないよう、リポジトリ変数
+# DEPLOY_ENABLED を "true" にするまでは実行しない
+#
+# 公開リポジトリ + self-hosted runner の前提:
+#   - Pull request の作成は Collaborators only に制限済み
+#   - fork からの workflow 実行は Actions 設定で承認必須
+#   - この job は push / workflow_dispatch のみ、かつ自リポジトリでしか動かない
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-recorder
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true'
+      && github.repository == 'shm11C3/home-tv-server'
+      && github.event_name != 'pull_request'
+    runs-on: [self-hosted, linux, recorder]
+    timeout-minutes: 15
+    env:
+      CHECKOUT_DIR: /opt/home-tv-server
+      TARGET_SHA: ${{ github.sha }}
+    steps:
+      # actions/checkout は使わない。runner の _work ではなく apps ロールが用意した
+      # 固定パスの checkout を、push された正確なコミットへ合わせる
+      - name: Update checkout to the pushed commit
+        run: |
+          set -euo pipefail
+          cd "$CHECKOUT_DIR"
+          git fetch --prune origin
+          git reset --hard "$TARGET_SHA"
+      - name: Apply compose stack
+        run: |
+          set -euo pipefail
+          cd "$CHECKOUT_DIR/apps/recorder"
+          docker compose pull --quiet
+          docker compose up -d --remove-orphans
+          docker image prune -f >/dev/null

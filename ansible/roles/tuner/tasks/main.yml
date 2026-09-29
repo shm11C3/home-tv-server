@@ -1,0 +1,91 @@
+---
+- name: Install smart card reader stack
+  ansible.builtin.apt:
+    name: "{{ tuner_cardreader_packages }}"
+    state: present
+    update_cache: true
+
+# Mirakurun コンテナは /dev/bus/usb に対して自前の pcscd を動かす。2 つのデーモンが
+# リーダを取り合うとデスクランブルが壊れるため、ホスト側の pcscd は止めておく
+- name: Keep host pcscd disabled
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - pcscd.socket
+    - pcscd.service
+  failed_when: false
+
+- name: Build px4_drv with DKMS
+  when: tuner_driver == 'px4_drv'
+  block:
+    - name: Install build dependencies
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - dkms
+          - git
+          - linux-headers-amd64
+          - unzip
+          - wget
+        state: present
+
+    - name: Clone px4_drv
+      ansible.builtin.git:
+        repo: "{{ tuner_px4_drv_repo }}"
+        dest: "{{ tuner_px4_drv_src_dir }}"
+        version: "{{ tuner_px4_drv_version }}"
+      register: tuner_px4_drv_git
+
+    - name: Read px4_drv version from dkms.conf
+      ansible.builtin.shell: set -o pipefail && grep -oP 'PACKAGE_VERSION="\K[^"]+' {{ tuner_px4_drv_src_dir }}/dkms.conf
+      args:
+        executable: /bin/bash
+      register: tuner_px4_drv_pkg_version
+      changed_when: false
+
+    - name: Install firmware (it930x-firmware.bin)
+      when: tuner_px4_drv_firmware_zip_url | length > 0
+      ansible.builtin.shell: |
+        set -euo pipefail
+        cd {{ tuner_px4_drv_src_dir }}/fwtool
+        make
+        wget -q -O driver.zip "{{ tuner_px4_drv_firmware_zip_url }}"
+        unzip -oj driver.zip '*/{{ tuner_px4_drv_firmware_sys_name }}' -d .
+        ./fwtool {{ tuner_px4_drv_firmware_sys_name }} it930x-firmware.bin
+        install -D -m 0644 it930x-firmware.bin /lib/firmware/it930x-firmware.bin
+      args:
+        executable: /bin/bash
+        creates: /lib/firmware/it930x-firmware.bin
+
+    # synchronize はリモート内コピーに使えないため rsync を直接呼ぶ
+    - name: Stage source for DKMS  # noqa: command-instead-of-module
+      ansible.builtin.command: >
+        rsync -a --delete {{ tuner_px4_drv_src_dir }}/ /usr/src/px4_drv-{{ tuner_px4_drv_pkg_version.stdout }}/
+      changed_when: tuner_px4_drv_git.changed
+
+    - name: Add and install DKMS module
+      ansible.builtin.shell: |
+        set -euo pipefail
+        dkms status px4_drv/{{ tuner_px4_drv_pkg_version.stdout }} | grep -q installed && exit 0
+        dkms add px4_drv/{{ tuner_px4_drv_pkg_version.stdout }} || true
+        dkms install px4_drv/{{ tuner_px4_drv_pkg_version.stdout }}
+        echo installed
+      args:
+        executable: /bin/bash
+      register: tuner_dkms
+      changed_when: "'installed' in tuner_dkms.stdout"
+
+    - name: Install udev rules and load module
+      ansible.builtin.copy:
+        src: "{{ tuner_px4_drv_src_dir }}/etc/99-px4video.rules"
+        dest: /etc/udev/rules.d/99-px4video.rules
+        remote_src: true
+        mode: "0644"
+
+    - name: Load px4_drv now
+      community.general.modprobe:
+        name: px4_drv
+        state: present
+      failed_when: false

@@ -1,0 +1,9 @@
+# Ansible 管理（home-tv-server）
+{% if proxmox_host_vfio_pci_ids | length > 0 %}
+options vfio-pci ids={{ proxmox_host_vfio_pci_ids | join(',') }} disable_vga=1
+softdep nouveau pre: vfio-pci
+softdep nvidia pre: vfio-pci
+softdep snd_hda_intel pre: vfio-pci
+{% else %}
+# デバイス ID 未設定。host_vars で proxmox_host_vfio_pci_ids を設定する
+{% endif %}

@@ -1,0 +1,43 @@
+---
+# 全ホスト共通の既定値。環境固有の値（ディスク ID、IP、デバイスパス）は
+# gitignore されている ansible/host_vars/<host>.yml に置く
+# ansible/host_vars/recorder.yml.example を参照
+
+recorder_admin_user: recorder
+recorder_timezone: Asia/Tokyo
+
+# --- ストレージ -----------------------------------------------------------------
+# 既存ファイルシステムのみ。/dev/disk/by-id を使い、/dev/sdX は使わない
+# storage ロールは意図的にディスクをフォーマットしない
+recording_disks: []
+recording_pool_mountpoint: /srv/recordings
+# mergerfs >= 2.40（Debian 13）では use_ino / direct_io が削除された
+# 以下はメディア用プール向けに現在推奨されているオプション
+recording_mergerfs_options: "cache.files=off,dropcacheonclose=true,category.create=mfs,minfreespace=20G,fsname=recordings"
+
+# --- tailscale -----------------------------------------------------------------
+# 空のままなら Tailscale をインストールするだけで tailnet には参加しない
+# キーはコミットせず TAILSCALE_AUTH_KEY を export する
+tailscale_auth_key: "{{ lookup('ansible.builtin.env', 'TAILSCALE_AUTH_KEY') | default('', true) }}"
+tailscale_extra_args: []   # 例: ["--ssh", "--advertise-tags=tag:recorder"]
+
+# --- 機能トグル（ハードウェアを確認したホストごとに有効化する）----------
+nvidia_enabled: false      # GPU passthrough 済み -> NVIDIA ドライバ + container toolkit
+tuner_enabled: false       # チューナー passthrough 済み -> ドライバ + カードリーダ
+apps_enabled: false        # このリポジトリを clone して apps/recorder を起動
+github_runner_enabled: false  # deploy 用の self-hosted runner をこの VM に置く
+
+# --- アプリ / デプロイ -------------------------------------------------------------
+apps_repo_url: https://github.com/shm11C3/home-tv-server.git
+apps_repo_version: main
+apps_checkout_dir: /opt/home-tv-server
+apps_compose_dir: "{{ apps_checkout_dir }}/apps/recorder"
+apps_start_on_configure: true
+# checkout と compose の所有者。runner を使う場合は runner ユーザーと一致させる
+# （deploy job が git pull と compose を実行するため）
+apps_owner: github-runner
+
+# --- バックアップ --------------------------------------------------------------------
+backup_dir: /var/backups/recorder
+backup_keep_days: 14
+backup_on_calendar: "*-*-* 04:30:00"

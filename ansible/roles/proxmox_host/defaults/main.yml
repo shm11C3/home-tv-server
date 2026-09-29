@@ -1,0 +1,26 @@
+---
+# Proxmox ホストのカーネルコマンドラインに追加するパラメータ
+# PVE 9 では AMD の IOMMU は既定で有効。iommu=pt は passthrough しない
+# デバイスのオーバーヘッドを減らすために引き続き有効
+proxmox_host_kernel_params:
+  - iommu=pt
+
+# 起動時に vfio-pci に掴ませる vendor:device ID（GPU のビデオ + オーディオ、
+# PCIe チューナーなど）。実機で lspci -nn を実行するまでは空にしておく
+proxmox_host_vfio_pci_ids: []
+# 例:
+# proxmox_host_vfio_pci_ids:
+#   - "10de:1c81"
+#   - "10de:0fb9"
+
+# passthrough する GPU に決してバインドさせないホスト側ドライバ
+proxmox_host_blacklist_modules:
+  - nouveau
+  - nvidia
+  - nvidiafb
+  - nvidia_drm
+
+proxmox_host_vfio_modules:
+  - vfio
+  - vfio_iommu_type1
+  - vfio_pci

@@ -1,0 +1,10 @@
+# 初回 bootstrap ではローカル state で十分（gitignore 済み）
+# 必要になったらリモートの暗号化バックエンドへ移す
+#
+# terraform {
+#   backend "s3" {
+#     bucket = "..."
+#     key    = "home-recorder/proxmox.tfstate"
+#     region = "auto"
+#   }
+# }

@@ -1,0 +1,5 @@
+# チャンネル一覧: 手で保守せず、実機のチューナーでスキャンする
+#   curl -X PUT "http://localhost:40772/api/config/channels/scan?type=GR"
+# スキャン前でもコンテナが起動できるよう空リストにしている
+---
+[]

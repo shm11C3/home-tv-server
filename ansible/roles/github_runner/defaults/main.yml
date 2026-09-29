@@ -1,0 +1,20 @@
+---
+# GitHub Actions self-hosted runner: deploy job をこの VM 上で直接実行する
+# runner は GitHub へ outbound HTTPS で job を取りに行くだけなので、外からの経路を作らない
+
+github_runner_repo: shm11C3/home-tv-server
+github_runner_user: github-runner
+github_runner_home: /opt/actions-runner
+github_runner_name: "{{ inventory_hostname }}"
+github_runner_labels:
+  - recorder
+
+# 登録トークンは 1 時間で失効する短命トークン。以下のいずれかで渡す
+#   1. 実行側（この playbook を回すマシン）で GITHUB_TOKEN（gh auth token など）を export しておく
+#      ロールが delegate_to: localhost で registration-token API を叩く。VM に PAT は残らない
+#   2. GITHUB_RUNNER_TOKEN に取得済みの登録トークンを直接入れる
+github_runner_registration_token: "{{ lookup('ansible.builtin.env', 'GITHUB_RUNNER_TOKEN') | default('', true) }}"
+github_runner_api_token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') | default('', true) }}"
+
+# 空なら最新リリースを使う。runner は自動更新されるため固定する意味は薄い
+github_runner_version: ""

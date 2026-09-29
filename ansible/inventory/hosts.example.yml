@@ -1,0 +1,13 @@
+---
+all:
+  children:
+    proxmox:
+      hosts:
+        pve:
+          ansible_host: 192.168.1.10
+          ansible_user: root
+    recorders:
+      hosts:
+        recorder:
+          ansible_host: 192.168.1.50
+          ansible_user: recorder

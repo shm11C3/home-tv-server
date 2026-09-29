@@ -1,0 +1,11 @@
+---
+profile: production
+exclude_paths:
+  - .github/
+  - apps/
+  - infra/
+  - ansible/inventory/hosts.example.yml
+  - ansible/host_vars/recorder.yml.example
+skip_list:
+  # apt 鍵は URL + signed-by で固定しているため、checksum なしの get_url を許容する
+  - risky-file-permissions

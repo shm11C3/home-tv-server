@@ -1,0 +1,37 @@
+# macOS / エディタ
+.DS_Store
+*.swp
+
+# OpenTofu / Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+infra/proxmox/terraform.tfvars
+infra/proxmox/*.auto.tfvars
+infra/proxmox/backend.tf
+# .terraform.lock.hcl は意図的にコミットする
+
+# Ansible: 実インベントリとホスト固有値は Git の外に置く
+ansible/inventory/hosts.yml
+ansible/host_vars/*.yml
+!ansible/host_vars/*.yml.example
+ansible/*.retry
+ansible/.ansible/
+
+# 秘密情報（将来 SOPS で暗号化したファイルだけをここに置く）
+secrets/
+!secrets/*.enc.yaml
+*.pem
+*.key
+id_ed25519*
+.env
+apps/**/.env
+
+# コミットしてはいけないランタイム状態
+apps/**/data/
+apps/**/recorded/
+apps/**/logs/
+apps/**/thumbnail/
+apps/**/db/

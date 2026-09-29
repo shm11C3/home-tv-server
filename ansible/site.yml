@@ -1,0 +1,19 @@
+---
+- name: Configure recorder server
+  hosts: recorders
+  become: true
+  roles:
+    - base
+    - docker
+    - storage
+    - tailscale
+    - role: nvidia
+      when: nvidia_enabled | bool
+    - role: tuner
+      when: tuner_enabled | bool
+    - role: apps
+      when: apps_enabled | bool
+    - role: backup
+      when: apps_enabled | bool
+    - role: github_runner
+      when: github_runner_enabled | bool

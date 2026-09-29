@@ -1,0 +1,65 @@
+# CI: third-party action はすべてコミット SHA で pin し、更新は Dependabot に任せる
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opentofu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.10.x
+      - name: fmt
+        run: tofu -chdir=infra/proxmox fmt -check -recursive -diff
+      - name: init (no backend)
+        run: tofu -chdir=infra/proxmox init -backend=false -input=false
+      - name: validate
+        run: tofu -chdir=infra/proxmox validate
+
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install lint tooling
+        run: pip install --disable-pip-version-check ansible-core ansible-lint yamllint
+      - name: Install collections
+        run: ansible-galaxy collection install -r ansible/requirements.yml
+      - name: yamllint
+        run: yamllint -s .
+      - name: ansible-lint
+        run: ansible-lint
+      - name: Syntax check (example inventory)
+        working-directory: ansible
+        run: |
+          ansible-playbook --syntax-check -i inventory/hosts.example.yml site.yml
+          ansible-playbook --syntax-check -i inventory/hosts.example.yml proxmox-host.yml
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: compose config
+        working-directory: apps/recorder
+        run: cp .env.example .env && docker compose config --quiet
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: actionlint
+        # イメージはダイジェストで pin（1.7.12、shellcheck / pyflakes 同梱版）
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color

@@ -1,0 +1,67 @@
+proxmox_endpoint = "https://192.168.1.10:8006/"
+node_name        = "pve"
+
+image_datastore_id = "local"     # "Import" コンテンツタイプを許可していること
+vm_datastore_id    = "local-lvm"
+
+recorder_vm_id      = 200
+recorder_cpu_cores  = 6
+recorder_memory_mb  = 8192
+recorder_os_disk_gb = 48
+network_bridge      = "vmbr0"
+
+# 初回 apply は false のまま。`make configure` で qemu-guest-agent が入ったら true にする
+guest_agent_enabled = false
+
+# 初回起動は DHCP のまま。後で固定アドレスに置き換える
+recorder_ipv4_address = "dhcp"
+recorder_ipv4_gateway = null
+
+admin_user = "recorder"
+ssh_public_keys = [
+  "ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY"
+]
+
+# ---------------------------------------------------------------------------
+# ハードウェア。実機を確認してから埋める（docs/bootstrap.md 手順 4）
+# ---------------------------------------------------------------------------
+
+# pci_hardware_mappings = {
+#   gpu-gtx1050 = {
+#     comment      = "NVIDIA GTX 1050（ビデオ + オーディオ ファンクション）"
+#     id           = "10de:1c81"
+#     path         = "0000:0a:00"      # .0 を省くとグループ内の全ファンクションを含む
+#     subsystem_id = "1458:3745"
+#     iommu_group  = 12
+#   }
+# }
+pci_hardware_mappings = {}
+
+# usb_hardware_mappings = {
+#   tuner = {
+#     comment = "PLEX PX-W3U4"
+#     id      = "0511:083f"
+#   }
+#   bcas-reader = {
+#     comment = "SCR3310 スマートカードリーダ"
+#     id      = "04e6:5116"
+#   }
+# }
+usb_hardware_mappings = {}
+
+# pci_passthrough = [
+#   { device = "hostpci0", mapping = "gpu-gtx1050" },
+# ]
+pci_passthrough = []
+
+# usb_passthrough = [
+#   { mapping = "tuner" },
+#   { mapping = "bcas-reader" },
+# ]
+usb_passthrough = []
+
+# recording_disk_passthrough = [
+#   { device = "/dev/disk/by-id/ata-WDC_REPLACE_ME", size_gb = 1862 },
+#   { device = "/dev/disk/by-id/ata-ST_REPLACE_ME",  size_gb = 3726 },
+# ]
+recording_disk_passthrough = []

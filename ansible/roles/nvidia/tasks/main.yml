@@ -1,0 +1,51 @@
+---
+- name: Enable contrib / non-free components
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/debian-nonfree.sources
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: http://deb.debian.org/debian
+      Suites: trixie trixie-updates
+      Components: contrib non-free non-free-firmware
+      Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+- name: Install kernel headers and NVIDIA driver
+  ansible.builtin.apt:
+    name: "{{ ['linux-headers-amd64'] + nvidia_packages }}"
+    state: present
+    update_cache: true
+
+- name: Install NVIDIA container toolkit keyring
+  ansible.builtin.shell: >
+    set -o pipefail &&
+    curl -fsSL {{ nvidia_container_toolkit_key_url }}
+    | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    executable: /bin/bash
+
+- name: Configure NVIDIA container toolkit repository
+  ansible.builtin.deb822_repository:
+    name: nvidia-container-toolkit
+    types: deb
+    uris: "{{ nvidia_container_toolkit_repo }}"
+    suites: /
+    signed_by: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    state: present
+
+- name: Install NVIDIA container toolkit
+  ansible.builtin.apt:
+    name: nvidia-container-toolkit
+    state: present
+    update_cache: true
+
+- name: Register nvidia runtime with Docker
+  ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
+  args:
+    creates: /etc/docker/daemon.json
+  notify: Restart docker
+
+- name: Reboot notice when the driver was just installed
+  ansible.builtin.debug:
+    msg: "nvidia-smi が失敗する場合は、新しいカーネルモジュールを読み込むため VM を一度再起動する。"

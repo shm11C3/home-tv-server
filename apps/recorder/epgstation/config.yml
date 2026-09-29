@@ -1,0 +1,45 @@
+# EPGStation 設定のテンプレート。%DB_*% プレースホルダはコンテナ起動時に .env の値で
+# 埋められる（compose.yml の epgstation サービスの command を参照）
+---
+port: 8888
+mirakurunPath: http://mirakurun:40772
+
+dbtype: mysql
+mysql:
+  host: mariadb
+  port: 3306
+  user: "%DB_USER%"
+  password: "%DB_PASSWORD%"
+  database: "%DB_NAME%"
+  charset: utf8mb4
+
+epgUpdateIntervalTime: 10
+conflictPriority: 1
+recPriority: 2
+recordedFormat: "%YEAR%%MONTH%%DAY%%HOUR%%MIN%%SEC%_%TITLE%"
+recordedFileExtension: .m2ts
+recorded:
+  - name: recorded
+    path: "/app/recorded"
+recordedTmp: /app/data/tmp
+thumbnail: /app/thumbnail
+thumbnailSize: 480x270
+thumbnailPosition: 5
+
+ffmpeg: /usr/local/bin/ffmpeg
+ffprobe: /usr/local/bin/ffprobe
+
+encodeProcessNum: 2
+concurrentEncodeNum: 1
+encode:
+  - name: H.264 (libx264)
+    cmd: "%NODE% %ROOT%/config/enc.js"
+    suffix: .mp4
+    rate: 4.0
+  # コンテナから GPU が使えるようになったら NVENC に切り替える:
+  # - name: H.264 (NVENC)
+  #   cmd: "%NODE% %ROOT%/config/enc.js"
+  #   suffix: .mp4
+  #   rate: 4.0
+
+# Kodi / Fire TV は Tailscale 経由で EPGStation に接続する。8888 を公開してはいけない

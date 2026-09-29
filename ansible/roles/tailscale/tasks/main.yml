@@ -1,0 +1,39 @@
+---
+- name: Install Tailscale keyring
+  ansible.builtin.get_url:
+    url: https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: "0644"
+
+- name: Configure Tailscale apt repository
+  ansible.builtin.get_url:
+    url: https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list
+    dest: /etc/apt/sources.list.d/tailscale.list
+    mode: "0644"
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+    update_cache: true
+
+- name: Enable tailscaled
+  ansible.builtin.service:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Read Tailscale backend state
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Join tailnet when an auth key is supplied
+  ansible.builtin.command:
+    argv: "{{ ['tailscale', 'up', '--auth-key=' ~ tailscale_auth_key, '--hostname=' ~ inventory_hostname] + tailscale_extra_args }}"
+  no_log: true
+  changed_when: true
+  when:
+    - tailscale_auth_key | length > 0
+    - tailscale_status.rc != 0 or (tailscale_status.stdout | from_json).BackendState != 'Running'

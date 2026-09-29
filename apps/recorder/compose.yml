@@ -1,0 +1,105 @@
+# 録画アプリケーションスタック。ランタイム状態（DB、録画、サムネイル、ログ）は
+# ./data と ${RECORDINGS_DIR} に置く。どちらも gitignore 済み
+---
+name: recorder
+
+services:
+  mirakurun:
+    image: chinachu/mirakurun:latest
+    container_name: mirakurun
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+      - SYS_NICE
+    # チューナーのキャラクタデバイスと B-CAS リーダ（USB）は VM から渡す
+    # イメージは自前の pcscd を動かすので、ホスト側で pcscd を動かしてはいけない（tuner ロール参照）
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+      # px4_drv は /dev/px4video0..N を作る。ドライバの動作確認後にコメントを外す
+      # - /dev/px4video0:/dev/px4video0
+      # - /dev/px4video1:/dev/px4video1
+      # - /dev/px4video2:/dev/px4video2
+      # - /dev/px4video3:/dev/px4video3
+    volumes:
+      - ./mirakurun/tuners.yml:/app-config/tuners.yml
+      - ./mirakurun/channels.yml:/app-config/channels.yml
+      - ./data/mirakurun/data:/app-data
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      LOG_LEVEL: ${MIRAKURUN_LOG_LEVEL:-2}
+    # 意図的に LAN には公開しない。EPGStation は compose ネットワーク経由で到達する
+    # Mirakurun の UI は `ssh -L 40772:localhost:40772 recorder` で開く
+    ports:
+      - "127.0.0.1:40772:40772"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  mariadb:
+    image: mariadb:11
+    container_name: epgstation-db
+    restart: unless-stopped
+    command: --performance-schema=false --expire-logs-days=1
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+      MARIADB_DATABASE: ${DB_NAME:-epgstation}
+      MARIADB_USER: ${DB_USER:-epgstation}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  epgstation:
+    image: l3tnun/epgstation:master-debian
+    container_name: epgstation
+    restart: unless-stopped
+    depends_on:
+      mirakurun:
+        condition: service_started
+      mariadb:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      DB_NAME: ${DB_NAME:-epgstation}
+      DB_USER: ${DB_USER:-epgstation}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # libx264 または nvenc（epgstation/enc.js が参照する）
+      ENCODER: ${ENCODER:-libx264}
+    # EPGStation は DB 認証情報を環境変数から読めないため、コミット済みのテンプレートを
+    # 起動時に .env の値で実設定へ展開する
+    command:
+      - sh
+      - -c
+      - >-
+        sed -e "s|%DB_USER%|$${DB_USER}|g" -e "s|%DB_PASSWORD%|$${DB_PASSWORD}|g" -e "s|%DB_NAME%|$${DB_NAME}|g"
+        /app/config/config.template.yml > /app/config/config.yml
+        && exec npm start
+    volumes:
+      - ./epgstation/config.yml:/app/config/config.template.yml:ro
+      - ./epgstation/enc.js:/app/config/enc.js
+      - ./data/epgstation/data:/app/data
+      - ./data/epgstation/logs:/app/logs
+      - ${RECORDINGS_DIR:-/srv/recordings}/recorded:/app/recorded
+      - ${RECORDINGS_DIR:-/srv/recordings}/thumbnail:/app/thumbnail
+    ports:
+      - "8888:8888"
+    # NVENC: GPU の passthrough と nvidia ロールの実行が済んだら有効化する
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu, video]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

@@ -1,0 +1,5 @@
+---
+# self-hosted runner のカスタムラベル（ansible/roles/github_runner の github_runner_labels と一致させる）
+self-hosted-runner:
+  labels:
+    - recorder

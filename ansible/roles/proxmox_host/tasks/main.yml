@@ -1,0 +1,64 @@
+---
+- name: Detect bootloader style
+  ansible.builtin.stat:
+    path: /etc/kernel/cmdline
+  register: proxmox_host_kernel_cmdline
+
+# --- systemd-boot / proxmox-boot-tool（ZFS ルート）-----------------------------
+- name: Ensure kernel params in /etc/kernel/cmdline
+  when: proxmox_host_kernel_cmdline.stat.exists
+  block:
+    - name: Read current cmdline
+      ansible.builtin.slurp:
+        path: /etc/kernel/cmdline
+      register: proxmox_host_cmdline_raw
+
+    - name: Write cmdline with required params
+      ansible.builtin.copy:
+        dest: /etc/kernel/cmdline
+        mode: "0644"
+        content: >-
+          {{ ((proxmox_host_cmdline_raw.content | b64decode | trim).split(' ') + proxmox_host_kernel_params) | unique | join(' ') }}
+      notify: Refresh proxmox-boot-tool
+
+# --- GRUB（ext4 / LVM ルート）--------------------------------------------------
+- name: Ensure kernel params in GRUB_CMDLINE_LINUX_DEFAULT
+  when: not proxmox_host_kernel_cmdline.stat.exists
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet {{ proxmox_host_kernel_params | join(" ") }}"'
+  notify: Update grub
+
+# --- vfio ------------------------------------------------------------------------
+- name: Load vfio modules at boot
+  ansible.builtin.lineinfile:
+    path: /etc/modules
+    line: "{{ item }}"
+    create: true
+    mode: "0644"
+  loop: "{{ proxmox_host_vfio_modules }}"
+  notify: Update initramfs
+
+- name: Blacklist host GPU drivers
+  ansible.builtin.template:
+    src: blacklist-passthrough.conf.j2
+    dest: /etc/modprobe.d/blacklist-passthrough.conf
+    mode: "0644"
+  notify: Update initramfs
+
+- name: Bind passthrough devices to vfio-pci
+  ansible.builtin.template:
+    src: vfio.conf.j2
+    dest: /etc/modprobe.d/vfio.conf
+    mode: "0644"
+  notify: Update initramfs
+
+- name: Flush handlers now so the reboot notice is accurate
+  ansible.builtin.meta: flush_handlers
+
+- name: Reboot required notice
+  ansible.builtin.debug:
+    msg: >-
+      passthrough の前提設定を書き込んだ。Proxmox ホストを再起動し、
+      `dmesg | grep -i iommu` と `lspci -nnk` で対象デバイスが vfio-pci を使っていることを確認する。

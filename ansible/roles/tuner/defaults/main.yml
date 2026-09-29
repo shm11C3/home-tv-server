@@ -1,0 +1,19 @@
+---
+# 実装済みなのは px4_drv（PLEX PX-W3U4 / PX-Q3U4 / PX-W3PE4 / PX-Q3PE4 / PX-MLT5PE など）のみ
+# tuner_driver を別の値にするとドライバのビルドをスキップし、
+# スマートカードリーダ関連だけをインストールする
+tuner_driver: px4_drv
+tuner_px4_drv_repo: https://github.com/nns779/px4_drv.git
+tuner_px4_drv_version: master
+tuner_px4_drv_src_dir: /usr/local/src/px4_drv
+# IT930x のファームウェアは PLEX の Windows ドライバから抽出する。URL はチューナーの
+# 型番によって異なる（px4_drv の README 参照）。空ならファームウェア導入をスキップする
+tuner_px4_drv_firmware_zip_url: ""
+tuner_px4_drv_firmware_sys_name: PXW3U4.sys
+
+# カードリーダのユーザランドはホスト側の診断用のみ。リーダ本体は Mirakurun コンテナが使う
+tuner_cardreader_packages:
+  - pcscd
+  - pcsc-tools
+  - libccid
+  - libpcsclite1

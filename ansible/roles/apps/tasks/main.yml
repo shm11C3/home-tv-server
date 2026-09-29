@@ -1,0 +1,50 @@
+---
+- name: Ensure apps owner exists (docker group, no sudo)
+  ansible.builtin.user:
+    name: "{{ apps_owner }}"
+    system: true
+    shell: /bin/bash
+    groups: docker
+    append: true
+
+- name: Check out this repository on the recorder
+  ansible.builtin.git:
+    repo: "{{ apps_repo_url }}"
+    dest: "{{ apps_checkout_dir }}"
+    version: "{{ apps_repo_version }}"
+    update: true
+  become: true
+  become_user: "{{ apps_owner }}"
+
+- name: Ensure runtime directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ apps_owner }}"
+    group: "{{ apps_owner }}"
+    mode: "0775"
+  loop:
+    - "{{ apps_compose_dir }}/data"
+    - "{{ apps_compose_dir }}/data/mirakurun"
+    - "{{ apps_compose_dir }}/data/epgstation"
+    - "{{ apps_compose_dir }}/data/mariadb"
+    - "{{ recording_pool_mountpoint }}/recorded"
+    - "{{ recording_pool_mountpoint }}/thumbnail"
+
+- name: Create .env from example when missing
+  ansible.builtin.copy:
+    src: "{{ apps_compose_dir }}/.env.example"
+    dest: "{{ apps_compose_dir }}/.env"
+    remote_src: true
+    force: false
+    owner: "{{ apps_owner }}"
+    mode: "0640"
+
+- name: Start recorder stack
+  ansible.builtin.shell: docker compose pull --quiet && docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ apps_compose_dir }}"
+  become: true
+  become_user: "{{ apps_owner }}"
+  when: apps_start_on_configure | bool
+  changed_when: true

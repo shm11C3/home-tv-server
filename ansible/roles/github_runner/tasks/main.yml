@@ -1,0 +1,147 @@
+---
+- name: Create runner user (no sudo, docker group only)
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    system: true
+    shell: /bin/bash
+    home: "{{ github_runner_home }}"
+    create_home: true
+    groups: docker
+    append: true
+
+- name: Install runner dependencies
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - jq
+      - libicu76
+    state: present
+    update_cache: true
+
+# --- リリース情報（実行側から GitHub API を参照）------------------------------
+- name: Resolve latest runner release
+  ansible.builtin.uri:
+    url: >-
+      https://api.github.com/repos/actions/runner/releases/{{
+        'latest' if github_runner_version | length == 0 else 'tags/v' ~ github_runner_version }}
+    headers:
+      Accept: application/vnd.github+json
+    return_content: true
+  delegate_to: localhost
+  become: false
+  register: github_runner_release
+
+- name: Extract version and checksum
+  ansible.builtin.set_fact:
+    github_runner_resolved_version: "{{ github_runner_release.json.tag_name | regex_replace('^v', '') }}"
+    github_runner_sha256: "{{ github_runner_release.json.body | regex_search('BEGIN SHA linux-x64 -->([0-9a-f]{64})<!--', '\\1') | first }}"
+
+- name: Check installed runner version
+  ansible.builtin.stat:
+    path: "{{ github_runner_home }}/bin/Runner.Listener"
+  register: github_runner_installed
+
+- name: Download and unpack runner
+  when: not github_runner_installed.stat.exists
+  block:
+    - name: Download runner tarball
+      ansible.builtin.get_url:
+        url: >-
+          https://github.com/actions/runner/releases/download/v{{ github_runner_resolved_version
+          }}/actions-runner-linux-x64-{{ github_runner_resolved_version }}.tar.gz
+        dest: "/tmp/actions-runner-{{ github_runner_resolved_version }}.tar.gz"
+        checksum: "sha256:{{ github_runner_sha256 }}"
+        mode: "0644"
+
+    - name: Unpack runner
+      ansible.builtin.unarchive:
+        src: "/tmp/actions-runner-{{ github_runner_resolved_version }}.tar.gz"
+        dest: "{{ github_runner_home }}"
+        remote_src: true
+        owner: "{{ github_runner_user }}"
+        group: "{{ github_runner_user }}"
+
+# --- 登録 ---------------------------------------------------------------------
+- name: Check whether the runner is already registered
+  ansible.builtin.stat:
+    path: "{{ github_runner_home }}/.runner"
+  register: github_runner_config
+
+- name: Obtain a registration token from the GitHub API
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ github_runner_repo }}/actions/runners/registration-token"
+    method: POST
+    headers:
+      Accept: application/vnd.github+json
+      Authorization: "Bearer {{ github_runner_api_token }}"
+    status_code: 201
+    return_content: true
+  delegate_to: localhost
+  become: false
+  no_log: true
+  register: github_runner_token_response
+  when:
+    - not github_runner_config.stat.exists
+    - github_runner_registration_token | length == 0
+    - github_runner_api_token | length > 0
+
+- name: Select registration token
+  ansible.builtin.set_fact:
+    github_runner_effective_token: >-
+      {{ github_runner_registration_token if github_runner_registration_token | length > 0
+         else (github_runner_token_response.json.token | default('')) }}
+  no_log: true
+  when: not github_runner_config.stat.exists
+
+- name: Fail when no registration token is available
+  ansible.builtin.fail:
+    msg: >-
+      runner 未登録で登録トークンもない。GITHUB_TOKEN（repo の Administration 権限）か
+      GITHUB_RUNNER_TOKEN を export して再実行する。
+  when:
+    - not github_runner_config.stat.exists
+    - github_runner_effective_token | trim | length == 0
+
+- name: Register runner
+  ansible.builtin.command:
+    argv:
+      - ./config.sh
+      - --unattended
+      - --replace
+      - --url
+      - "https://github.com/{{ github_runner_repo }}"
+      - --token
+      - "{{ github_runner_effective_token | trim }}"
+      - --name
+      - "{{ github_runner_name }}"
+      - --labels
+      - "{{ github_runner_labels | join(',') }}"
+      - --work
+      - _work
+    chdir: "{{ github_runner_home }}"
+  become: true
+  become_user: "{{ github_runner_user }}"
+  no_log: true
+  changed_when: true
+  when: not github_runner_config.stat.exists
+
+# --- systemd -------------------------------------------------------------------
+- name: Install runner service
+  ansible.builtin.command:
+    argv: ["./svc.sh", "install", "{{ github_runner_user }}"]
+    chdir: "{{ github_runner_home }}"
+    creates: "{{ github_runner_home }}/.service"
+  notify: Start runner service
+
+- name: Read service name
+  ansible.builtin.slurp:
+    path: "{{ github_runner_home }}/.service"
+  register: github_runner_service_file
+
+- name: Enable runner service
+  ansible.builtin.systemd:
+    name: "{{ github_runner_service_file.content | b64decode | trim }}"
+    enabled: true
+    state: started
+    daemon_reload: true

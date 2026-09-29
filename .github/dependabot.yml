@@ -1,0 +1,11 @@
+---
+# SHA で pin した action の追従用（バージョンコメント付きの SHA pin は Dependabot が更新できる）
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
