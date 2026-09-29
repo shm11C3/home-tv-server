@@ -86,7 +86,7 @@ make configure   # recorder VM: base, docker, storage, tailscale（トグル有�
 - 秘密情報は環境変数（`PROXMOX_VE_API_TOKEN`、`TAILSCALE_AUTH_KEY`）か GitHub Secrets で渡し、Git には置かない
 
 物理ホストの引き渡しチェックリストは [docs/bootstrap.md](docs/bootstrap.md)、
-責務境界は [docs/architecture.md](docs/architecture.md) を参照。
+責務境界は [docs/architecture.md](docs/architecture.md)、残タスクは [docs/todo.md](docs/todo.md) を参照。
 
 ## ライセンス
 
