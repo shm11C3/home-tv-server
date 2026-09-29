@@ -56,10 +56,21 @@ jobs:
 
   actionlint:
     runs-on: ubuntu-latest
+    env:
+      ACTIONLINT_VERSION: 1.7.12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install actionlint (checksum verified)
+        # リポジトリの Actions 設定で第三者 action を絞っているため、Docker action ではなく
+        # リリースバイナリを checksums.txt で検証してから使う
+        run: |
+          set -euo pipefail
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "${base}/${tarball}"
+          curl -fsSLO "${base}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          grep " ${tarball}\$" "actionlint_${ACTIONLINT_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "${tarball}" actionlint
+          install -m 0755 actionlint /usr/local/bin/actionlint
       - name: actionlint
-        # イメージはダイジェストで pin（1.7.12、shellcheck / pyflakes 同梱版）
-        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
-        with:
-          args: -color
+        run: actionlint -color
