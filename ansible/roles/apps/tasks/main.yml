@@ -7,6 +7,36 @@
     groups: docker
     append: true
 
+# 録画プールが本当にマウントされているかを確認する。未マウントのまま進むと
+# /srv/recordings 配下が OS ディスク上の普通のディレクトリとして作られ、録画が OS ディスクを埋める
+- name: Read recording pool mount
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, FSTYPE, --mountpoint, "{{ recording_pool_mountpoint }}"]
+  register: apps_recording_mount
+  changed_when: false
+  failed_when: false
+
+- name: Assert recording pool is mounted
+  ansible.builtin.assert:
+    that:
+      - apps_recording_mount.rc == 0
+      - apps_recording_mount.stdout | trim == apps_recording_fstype
+    fail_msg: >-
+      {{ recording_pool_mountpoint }} が {{ apps_recording_fstype }} としてマウントされていない
+      （現在: {{ apps_recording_mount.stdout | trim | default('未マウント', true) }}）。
+      recording_disks を設定して storage ロールを通すか、検証用途なら apps_require_recording_mount: false にする
+    quiet: true
+  when: apps_require_recording_mount | bool
+
+# /opt は root 所有なので、非 root の apps_owner が clone できるよう先に作って渡す
+- name: Create checkout directory
+  ansible.builtin.file:
+    path: "{{ apps_checkout_dir }}"
+    state: directory
+    owner: "{{ apps_owner }}"
+    group: "{{ apps_owner }}"
+    mode: "0755"
+
 - name: Check out this repository on the recorder
   ansible.builtin.git:
     repo: "{{ apps_repo_url }}"

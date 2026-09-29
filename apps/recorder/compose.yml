@@ -86,8 +86,18 @@ services:
       - ./epgstation/enc.js:/app/config/enc.js
       - ./data/epgstation/data:/app/data
       - ./data/epgstation/logs:/app/logs
-      - ${RECORDINGS_DIR:-/srv/recordings}/recorded:/app/recorded
-      - ${RECORDINGS_DIR:-/srv/recordings}/thumbnail:/app/thumbnail
+      # 録画先はホスト側にディレクトリが無ければ作らせない。プール未マウント時は
+      # ディレクトリが存在しないので、OS ディスクに書く代わりにコンテナ起動が失敗する
+      - type: bind
+        source: ${RECORDINGS_DIR:-/srv/recordings}/recorded
+        target: /app/recorded
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RECORDINGS_DIR:-/srv/recordings}/thumbnail
+        target: /app/thumbnail
+        bind:
+          create_host_path: false
     ports:
       - "8888:8888"
     # NVENC: GPU の passthrough と nvidia ロールの実行が済んだら有効化する

@@ -70,13 +70,40 @@ lspci -nnk | grep -A3 -i nvidia    # "Kernel driver in use: vfio-pci" になっ�
 
 ## 6. API 認証情報の作成
 
-OpenTofu 用に専用の Proxmox ユーザー / API トークンを作り、ローカルで環境変数として渡す。
+OpenTofu 用に専用の Proxmox ユーザー、ロール、API トークンを作る。Proxmox ホストで実行する。
 
 ```bash
-export PROXMOX_VE_API_TOKEN='terraform@pve!provider=...'
+pveum role add TofuRecorder -privs "VM.Allocate VM.Audit VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.PowerMgmt VM.Console VM.GuestAgent.Audit Datastore.Allocate Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit Sys.Audit Sys.AccessNetwork SDN.Use Mapping.Audit Mapping.Modify Mapping.Use"
+pveum user add tofu@pve
+pveum aclmod / -user tofu@pve -role TofuRecorder
+pveum user token add tofu@pve provider --privsep 0
 ```
 
-権限は bpg provider のドキュメントにある権限セットから始め、初回の plan / apply が通ってから絞る。`recording_disk_passthrough`（ホストのブロックデバイス）は `root@pam` でしか使えない。権限を絞ったトークンを維持したい場合は SATA コントローラを PCI で passthrough する。
+ローカルでは環境変数として渡す。
+
+```bash
+export PROXMOX_VE_API_TOKEN='tofu@pve!provider=...'
+```
+
+権限の根拠は Proxmox API のパーミッション定義による。
+
+| 操作                                 | 必要な権限                                                   |
+| ------------------------------------ | ------------------------------------------------------------ |
+| cloud image の取得（download-url）   | `Datastore.AllocateTemplate` と `Sys.AccessNetwork`          |
+| VM 作成・設定                        | `VM.Allocate`、`VM.Config.*`、`Datastore.AllocateSpace`、ブリッジの `SDN.Use` |
+| Resource Mapping の作成（PCI / USB） | `Mapping.Modify`                                             |
+| マッピング済みデバイスの VM への接続 | `Mapping.Use`                                                |
+
+Resource Mapping の作成は上記ロールの API トークンで行える。root が必要になるのは、ホストの任意パスを VM に接続する `recording_disk_passthrough` だけ。Proxmox はこの操作を `root@pam` 本人にしか許さず、`root@pam` 自身の API トークンでも拒否される。使う場合はトークンではなくパスワード認証で apply する。
+
+```bash
+unset PROXMOX_VE_API_TOKEN
+export PROXMOX_VE_USERNAME=root@pam
+read -rs PROXMOX_VE_PASSWORD && export PROXMOX_VE_PASSWORD
+make apply
+```
+
+以後も VM 定義を変えるたびに root のパスワード認証が必要になるので、SATA コントローラが独立した IOMMU グループにあるならコントローラの PCI passthrough を優先する。こちらは Resource Mapping 経由なので制限付きトークンのまま運用できる。
 
 ## 7. 実値の記入
 

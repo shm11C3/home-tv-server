@@ -1,2 +1,6 @@
 ---
 # apps_owner は group_vars/all.yml で定義する
+
+# 録画プールが mergerfs としてマウントされていなければアプリを起動しない
+apps_require_recording_mount: true
+apps_recording_fstype: fuse.mergerfs

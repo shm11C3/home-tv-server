@@ -16,9 +16,9 @@
 - [ ] `local` データストアに Import コンテンツタイプを追加
 - [ ] `lspci -nnk`、IOMMU グループ、`lsusb`、`/dev/disk/by-id`、SMART、`lsblk -f` を記録（bootstrap.md 手順 4）
 - [ ] SATA コントローラが独立した IOMMU グループにあるか確認し、HDD の渡し方を決める
-  - コントローラ passthrough: `pci_passthrough` に追加
-  - raw ディスク passthrough: `recording_disk_passthrough` に追加。OpenTofu 用ユーザーは root@pam が必要
-- [ ] OpenTofu 用の API トークンを作成
+  - コントローラ passthrough（推奨）: `pci_hardware_mappings` と `pci_passthrough` に追加。制限付きトークンで運用できる
+  - raw ディスク passthrough: `recording_disk_passthrough` に追加。apply には root@pam のパスワード認証が必要
+- [ ] OpenTofu 用のロールと API トークンを作成（bootstrap.md 手順 6）
 
 ## 2. ホスト設定と VM 作成
 
@@ -45,7 +45,7 @@
 - [ ] `tuner_enabled: true` と `tuner_px4_drv_firmware_zip_url` を設定して `make configure`。`/dev/px4video*` を確認
   - px4_drv の導入手順は実機未検証。崩れる可能性が最も高い箇所
 - [ ] HDD: 渡し方に応じて `make apply` → VM 内で `lsblk -f` → `recording_disks` を埋めて `make configure`
-- [ ] `/srv/recordings` に書き込めることを確認
+- [ ] `/srv/recordings` に書き込めることを確認。`findmnt /srv/recordings` が `fuse.mergerfs` であること
 
 ## 5. アプリ起動（ここまでで「使える」状態）
 
@@ -70,5 +70,5 @@
 | 項目                 | 決まる時期               | 影響範囲                                   |
 | -------------------- | ------------------------ | ------------------------------------------ |
 | チューナーの機種     | 購入時                   | `roles/tuner`、`tuners.yml`、USB マッピング |
-| HDD の渡し方         | 実機の IOMMU グループ確認後 | OpenTofu の変数、API ユーザーの権限        |
+| HDD の渡し方         | 実機の IOMMU グループ確認後 | OpenTofu の変数、apply 時の認証方式        |
 | バックアップの退避先 | 後回しで可               | `roles/backup` の拡張                      |

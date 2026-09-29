@@ -43,6 +43,14 @@ jobs:
           cd "$CHECKOUT_DIR"
           git fetch --prune origin
           git reset --hard "$TARGET_SHA"
+      - name: Assert recording pool is mounted
+        run: |
+          set -euo pipefail
+          fstype="$(findmnt --noheadings --output FSTYPE --mountpoint /srv/recordings || true)"
+          if [ "$fstype" != "fuse.mergerfs" ]; then
+            echo "::error::/srv/recordings が mergerfs としてマウントされていない（現在: ${fstype:-未マウント}）"
+            exit 1
+          fi
       - name: Apply compose stack
         run: |
           set -euo pipefail

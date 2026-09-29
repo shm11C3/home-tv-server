@@ -54,7 +54,7 @@ docs/                bootstrap 手順とアーキテクチャメモ
 - OpenTofu >= 1.8、Ansible、`ansible-lint`、`yamllint`、`actionlint`
 - recorder VM 用の SSH 鍵ペア
 - Proxmox API トークンを環境変数 `PROXMOX_VE_API_TOKEN` で渡すこと
-  （`recording_disk_passthrough` でディスクを丸ごと渡す場合は `root@pam` が必要）
+  （必要な権限は docs/bootstrap.md 手順 6。`recording_disk_passthrough` だけは `root@pam` のパスワード認証が必要）
 
 ## プロビジョニング手順
 

@@ -22,10 +22,17 @@
 
 OS ディスクは Debian cloud image から取り込んだ仮想ディスク。録画用 HDD は別枝でモデル化し、次のいずれかで VM に見せる。
 
-1. OpenTofu の `recording_disk_passthrough` でブロックデバイスを丸ごと渡す（provider 上 experimental、`root@pam` 必須）。
-2. SATA コントローラが独立した IOMMU グループにある場合は PCI デバイスとして passthrough する。
+1. SATA コントローラが独立した IOMMU グループにある場合は、Resource Mapping 経由で PCI passthrough する（推奨）。制限付き API トークンのまま運用できる。
+2. それができない場合は OpenTofu の `recording_disk_passthrough` でブロックデバイスを丸ごと渡す。provider 上 experimental で、apply には `root@pam` のパスワード認証が必要になる。
 
-VM 内では既存ファイルシステムを `nofail` 付きで個別マウントし、mergerfs で束ねる。Ansible ロールはディスクをフォーマットしない。ドライブが 1 台壊れても、失うのはそのドライブに物理的に載っていたファイルだけになる。
+VM 内では既存ファイルシステムを `nofail` 付きで個別マウントし、mergerfs で束ねる。
+
+プール未マウントのまま録画が OS ディスクに書かれるのを防ぐため、3 段で止める。
+
+- apps ロールは `/srv/recordings` が `fuse.mergerfs` でなければ失敗する。
+- deploy workflow も compose 適用前に同じ確認をする。
+- compose の録画先 bind mount はホスト側ディレクトリを自動作成しない。再起動時にプールが上がらなければ EPGStation が起動しない。
+Ansible ロールはディスクをフォーマットしない。ドライブが 1 台壊れても、失うのはそのドライブに物理的に載っていたファイルだけになる。
 
 ## 機能トグル
 

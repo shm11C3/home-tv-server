@@ -192,10 +192,11 @@ variable "recording_disk_passthrough" {
   description = <<-EOT
     物理ディスクを raw ブロックデバイスとして VM に丸ごと渡す。安定した
     /dev/disk/by-id/... を使い、/dev/sdX は使わない。インターフェースは scsi1 から
-    provider の experimental な path_in_datastore 機能を使うため、API ユーザーは
-    root@pam である必要がある（非 root の API トークンではホストのブロックデバイスを
-    接続できない）。代替: SATA コントローラが独立した IOMMU グループにあるなら
-    pci_passthrough で passthrough する
+    provider の experimental な path_in_datastore 機能を使う。Proxmox はホストの任意パスの
+    接続を root@pam 本人にしか許さず、root@pam の API トークンでも拒否されるため、
+    使う場合はパスワード認証（PROXMOX_VE_USERNAME / PROXMOX_VE_PASSWORD）で apply する
+    推奨: SATA コントローラが独立した IOMMU グループにあるなら pci_passthrough で渡す
+    （Resource Mapping 経由なので制限付き API トークンのまま運用できる）
   EOT
   type = list(object({
     device  = string
