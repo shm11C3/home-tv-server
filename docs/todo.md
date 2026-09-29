@@ -11,6 +11,8 @@
 
 ## 1. 物理組み立てと Proxmox（手作業）
 
+- [ ] ルーターで管理セグメントと録画セグメントを static route でつなぐ。戻りの経路とフィルタも設定（bootstrap.md 手順 1.5）
+- [ ] 家族回線側の回線ルーターに管理セグメント宛ての static route を入れられるか確認
 - [ ] 組み立て、BIOS（SVM、IOMMU、Above 4G Decoding、CSM 無効）
 - [ ] Proxmox VE 9 インストール、固定 IP
 - [ ] `local` データストアに Import コンテンツタイプを追加
@@ -72,3 +74,4 @@
 | チューナーの機種     | 購入時                   | `roles/tuner`、`tuners.yml`、USB マッピング |
 | HDD の渡し方         | 実機の IOMMU グループ確認後 | OpenTofu の変数、apply 時の認証方式        |
 | バックアップの退避先 | 後回しで可               | `roles/backup` の拡張                      |
+| 戻りの経路の置き場所 | ルーター設定時           | 家族回線側ルーターの設定可否に依存          |

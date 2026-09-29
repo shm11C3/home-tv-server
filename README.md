@@ -14,6 +14,8 @@ public repo ですが、第三者からのPRは受け付けていません
 
 ## 目標アーキテクチャ
 
+![構成図](docs/architecture.drawio.svg)
+
 ```text
 物理マシン (Ryzen 5, GTX 1050, TV チューナー, SSD + 録画用 HDD)
 └─ Proxmox VE 9
@@ -82,7 +84,7 @@ make configure   # recorder VM: base, docker, storage, tailscale（トグル有�
 - 録画用 HDD は個別にマウントして mergerfs で束ねる。このリポジトリはディスクをフォーマットしない
 - 機能ロール（`nvidia`、`tuner`、`apps`、`github_runner`）は既定で無効。ハードウェアを確認したホストだけで有効化する。
 - アプリのデプロイは recorder VM 上の self-hosted runner が行う。外からの SSH 経路は作らず、runner が GitHub へ取りに行くだけ。公開リポジトリのため Pull Request 作成は Collaborators only に制限し、fork からの workflow 実行は承認必須にする
-- Mirakurun と EPGStation は LAN と tailnet からのみ到達可能にする。
+- Mirakurun と EPGStation は LAN と tailnet からのみ到達可能にする。管理端末は別セグメントにあり、ルーターの static route 経由で Proxmox と VM を操作する。
 - 秘密情報は環境変数（`PROXMOX_VE_API_TOKEN`、`TAILSCALE_AUTH_KEY`）か GitHub Secrets で渡し、Git には置かない
 
 物理ホストの引き渡しチェックリストは [docs/bootstrap.md](docs/bootstrap.md)、

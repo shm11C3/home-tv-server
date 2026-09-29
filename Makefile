@@ -2,7 +2,7 @@ SHELL := /bin/bash
 TF_DIR := infra/proxmox
 ANSIBLE_DIR := ansible
 
-.PHONY: fmt init validate plan apply deps host configure check lint lint-ansible lint-compose lint-actions
+.PHONY: fmt init validate plan apply deps host configure check lint lint-ansible lint-compose lint-actions diagram
 
 ## OpenTofu -------------------------------------------------------------------
 fmt:
@@ -49,3 +49,7 @@ lint-compose:
 
 lint-actions:
 	actionlint -color
+
+## Docs -----------------------------------------------------------------------
+diagram: ## docs/*.drawio.svg を GitHub 表示向けに書き出し直す（draw.io デスクトップ版が必要）
+	./scripts/export-diagram.sh
